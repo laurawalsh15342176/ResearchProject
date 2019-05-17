@@ -1,2 +1,554 @@
 #Reseach Project Code 
 #Using SIAR and other techniques 
+
+#SIAR Section
+#The model assumes that each target value comes from a Gaussian 
+#distribution with an unknown mean and standard deviation. 
+#Assumed that sources are independent
+#Not all Trial_Data
+
+#setwd("~/UCD/Stage 4/Semester 2/Research Project/Data")
+library(readxl)
+Trial_Data <- read_excel("Trial_Data.xls")
+Trial_Data <- Trial_Data[-c(6,40), ]
+#IN THIS SCRIPT "Trial Data" is only going to have 100% Grass and 
+#100% Concentrate as that is what we are taking to be the "sources" 
+attach(Trial_Data)
+View(Trial_Data)
+
+library(psych)
+pairs.panels(Trial_Data[-c(25:48),-1], 
+             method = "pearson", # correlation method
+             density = TRUE,  # show density plots
+             ellipses = F) # show correlation ellipses
+
+#most are actually possibly okay to transform 
+#some could be fixed by square root, cube root, log 
+
+#Trying to fix to be more normal
+plot(density(d13C[Treatment=="100%Grass"]))  
+plot(density(d13C[Treatment=="Concentrates"]))                 
+
+plot(density(`C 18:2,C9,C12.`[Treatment=="100%Grass"]))
+plot(density(`C 18:2,C9,C12.`[Treatment=="Concentrates"]))
+
+plot(density(log(`CLA(C 18:2,C9,T11)`[Treatment=="100%Grass"])))
+plot(density(log(`CLA(C 18:2,C9,T11)`[Treatment=="Concentrates"]))) 
+
+plot(density(Trial_Data$`n-3 Fatty Acids`[Treatment=="100%Grass"]))
+plot(density(Trial_Data$`n-3 Fatty Acids`[Treatment=="Concentrates"]))
+
+plot(density(Trial_Data$`C 18:3C9,C12,C15.`[Treatment=="100%Grass"]))
+plot(density(Trial_Data$`C 18:3C9,C12,C15.`[Treatment=="Concentrates"]))
+
+plot(density(Trial_Data$`n-6 : n-3`[Treatment=="100%Grass"]))
+plot(density(Trial_Data$`n-6 : n-3`[Treatment=="Concentrates"]))
+
+shapiro.test(d13C[Treatment=="100%Grass"])                   
+shapiro.test(`C 18:2,C9,C12.`[Treatment=="100%Grass"])
+shapiro.test(`C 18:3C9,C12,C15.`[Treatment=="100%Grass"])
+shapiro.test(log(`CLA(C 18:2,C9,T11)`[Treatment=="100%Grass"])) 
+shapiro.test(`n-3 Fatty Acids`[Treatment=="100%Grass"])
+shapiro.test(`n-6 : n-3`[Treatment=="100%Grass"])
+
+shapiro.test(d13C[Treatment=="Concentrates"])                   
+shapiro.test(`C 18:2,C9,C12.`[Treatment=="Concentrates"])
+shapiro.test(`C 18:3C9,C12,C15.`[Treatment=="Concentrates"])
+shapiro.test(log(`CLA(C 18:2,C9,T11)`[Treatment=="Concentrates"]))
+shapiro.test(`n-3 Fatty Acids`[Treatment=="Concentrates"]) 
+shapiro.test(`n-6 : n-3`[Treatment=="Concentrates"])
+#all passing shapiro wilk test now 
+#all follow normal assumption
+
+#Validation Step 
+#Checking if we can use the data we have in SIAR the way we wish to 
+Trial_Data <- read_excel("Trial_Data.xls")
+View(Trial_Data)
+
+Trial_Data <- Trial_Data[-c(6,40), ] #getting rid of NAs
+Trial_Data$`CLA(C 18:2,C9,T11)` <- log(Trial_Data$`CLA(C 18:2,C9,T11)`)
+attach(Trial_Data)
+
+GrassStDev = apply(Trial_Data[Treatment=="100%Grass",-1], 2, sd)
+ConcentratesStDev = apply(Trial_Data[Treatment=="Concentrates",-1], 2, sd)
+GrassMean = apply(Trial_Data[Treatment=="100%Grass",-1], 2, mean)
+ConcentratesMean = apply(Trial_Data[Treatment=="Concentrates",-1], 2, mean)
+
+cowsource <- matrix(c(GrassMean[1],GrassStDev[1],GrassMean[2],GrassStDev[2],
+                      GrassMean[3],GrassStDev[3],GrassMean[4],GrassStDev[4],GrassMean[5],
+                      GrassStDev[5],GrassMean[6],GrassStDev[6], ConcentratesMean[1],ConcentratesStDev[1],
+                      ConcentratesMean[2],ConcentratesStDev[2],ConcentratesMean[3],ConcentratesStDev[3],
+                      ConcentratesMean[4],ConcentratesStDev[4],ConcentratesMean[5],ConcentratesStDev[5],
+                      ConcentratesMean[6],ConcentratesStDev[6]), byrow=T, nrow=2, ncol=12)
+cowsource <- data.frame(c("Grass", "Concentrate"), cowsource)
+
+colnames(cowsource) <- c("Sources", 
+                         "d13C Mean", "d13C SD", 
+                         "C 18:2,C9,C12. Mean", "C 18:2,C9,C12. SD", 
+                         " C 18:3C9,C12,C15. Mean", " C 18:3C9,C12,C15. SD", 
+                         " CLA(C 18:2,C9,T11) Mean", " CLA(C 18:2,C9,T11) SD",
+                         "n-3 Fatty Acids Mean", "n-3 Fatty Acids SD",
+                         "n-6 : n-3 Mean", "n-6 : n-3 SD")
+View(cowsource)
+
+#Histogram
+validation <- siarmcmcdirichletv4(as.matrix(Trial_Data[25:48, 2:7]), cowssource)
+siarhistograms(validation, legloc = 'topleft') 
+2
+text(0.75, 23, "50:50 Grass to Concentrate", cex=1)
+#plot shows 50:50 dietary proportion are we were expecting
+
+#now to move on to non-experimental data to estimate dietary proportions
+NonTrial_Data <- read_excel("NonTrial_Data.xls")
+NonTrial_Data <- NonTrial_Data[ , c(6,8,57,61,62,89,90)] #only keeping relevant cols
+NonTrial_Data <- NonTrial_Data[-c(5,6,24,72:78), ] #getting rid of NAs
+NonTrial_Data$`CLA(C 18:2,C9,T11)` <- log(NonTrial_Data$`CLA(C 18:2,C9,T11)`) #log transform 
+for(i in (1:116)){
+  for(j in (1:7)){
+    ifelse(NonTrial_Data[i,j]=="IRELAND Superquinn", 
+           NonTrial_Data[i,j]<-"IRELAND", NonTrial_Data[i,j]<-NonTrial_Data[i,j]) 
+  }
+}  
+for(i in (1:116)){
+  for(j in (1:7)){
+    ifelse(NonTrial_Data[i,j]=="IRELAND Organic", 
+           NonTrial_Data[i,j]<-"IRELAND", NonTrial_Data[i,j]<-NonTrial_Data[i,j]) 
+  }
+}
+
+View(NonTrial_Data)
+attach(NonTrial_Data)
+
+#Histograms
+austria <- siarmcmcdirichletv4(NonTrial_Data[1:4, ] , cowsource)
+siarhistograms(austria, legloc = 'topleft') 
+2
+text(0.5, 15, "Austrian Cattle", cex=1)
+
+brazil <- siarmcmcdirichletv4(NonTrial_Data[5:21, ] , cowsource)
+siarhistograms(brazil, legloc = 'topleft') 
+2
+text(0.3, 7, "Brazilian Cattle", cex=1)
+
+uk <- siarmcmcdirichletv4(NonTrial_Data[22:40, ] , cowsource)
+siarhistograms(uk, legloc = 'topleft')
+2
+text(0.5, 6, "UK Cattle", cex=1)
+
+france <- siarmcmcdirichletv4(NonTrial_Data[41:44, ] , cowsource)
+siarhistograms(france, legloc = 'topleft') 
+2
+text(0.5, 3.5, "French Cattle", cex=1)
+
+germany <- siarmcmcdirichletv4(NonTrial_Data[45:50, ] , cowsource)
+siarhistograms(germany, legloc = 'topleft') 
+2
+text(0.5, 11, "German Cattle", cex=1)
+
+italy <- siarmcmcdirichletv4(NonTrial_Data[51:68, ] , cowsource)
+siarhistograms(italy, legloc = 'topleft') 
+2
+text(0.5, 7, "Italian Cattle", cex=1)
+
+#spain - no fatty acids on spanish cows 
+
+us <- siarmcmcdirichletv4(NonTrial_Data[69:90, ] , cowsource)
+siarhistograms(us, legloc = 'topleft') 
+2
+text(0.5, 12, "US Cattle", cex=1)
+
+ireland <- siarmcmcdirichletv4(NonTrial_Data[91:116, ] , cowsource)
+siarhistograms(ireland, legloc = 'topleft')
+2
+text(0.5, 45, "Irish Cattle", cex=1)
+
+#histograms obtained - must run data through siarmenu() function to obtain summary statistics for estimated dietary proportions 
+
+NonTrial_Data$Group <- c(rep(1,4), rep(2,17), rep(3,19), rep(4,4), rep(5,6), 
+                         rep(6,18), rep(7,22), rep(8,26))
+NonTrial_Data <- NonTrial_Data[,c(8,1:7)] #bringing group to the front
+multigroup <- NonTrial_Data[,-2]
+multigroup <- as.matrix(multigroup)
+View(multigroup)
+str(multigroup)
+head(multigroup)
+
+#Then run in SIAR 
+siarmenu()
+
+#Add in C4 plant material as dietary source 
+c3_mean <- -29.6 
+c3_sd <- 0.3
+c4_mean <- -11.8
+c4_sd <- 0.1 
+con_mean <- -26.3
+con_sd <- 0.5  #Bahar et al. 
+
+#going to change "grass" to "c3 grass" and "c4 grass"
+#changing rows of source data frame - 3 rows
+#means and sds will be identical for c3 and c4 grass EXCEPT for d13c 
+#where I'm putting in stats found online (taking out d13c stats from trial data)
+#nothing I can really do about trying to break up concentrate - leave as is
+
+GrassStDev = apply(Trial_Data[Treatment=="100%Grass",-1], 2, sd)
+ConcentratesStDev = apply(Trial_Data[Treatment=="Concentrates",-1], 2, sd)
+GrassMean = apply(Trial_Data[Treatment=="100%Grass",-1], 2, mean)
+ConcentratesMean = apply(Trial_Data[Treatment=="Concentrates",-1], 2, mean)
+
+cowsourceC3_C4 <- matrix(c(c3_mean,c3_sd,GrassMean[2],GrassStDev[2],
+                           GrassMean[3],GrassStDev[3],GrassMean[4],GrassStDev[4],GrassMean[5],
+                           GrassStDev[5],GrassMean[6],GrassStDev[6],
+                           c4_mean,c4_sd,GrassMean[2],GrassStDev[2],
+                           GrassMean[3],GrassStDev[3],GrassMean[4],GrassStDev[4],GrassMean[5],
+                           GrassStDev[5],GrassMean[6],GrassStDev[6],
+                           ConcentratesMean[1],ConcentratesStDev[1],
+                           ConcentratesMean[2],ConcentratesStDev[2],ConcentratesMean[3],ConcentratesStDev[3],
+                           ConcentratesMean[4],ConcentratesStDev[4],ConcentratesMean[5],ConcentratesStDev[5],
+                           ConcentratesMean[6],ConcentratesStDev[6]), byrow=T, nrow=3, ncol=12)
+cowsourceC3_C4 <- data.frame(c("C3 Grass", "C4 Plant Material", "C3 Concentrate"), cowsourceC3_C4)
+
+colnames(cowsourceC3_C4) <- c("Sources", 
+                              "d13C Mean", "d13C SD", 
+                              "C 18:2,C9,C12. Mean", "C 18:2,C9,C12. SD", 
+                              " C 18:3C9,C12,C15. Mean", " C 18:3C9,C12,C15. SD", 
+                              " CLA(C 18:2,C9,T11) Mean", " CLA(C 18:2,C9,T11) SD",
+                              "n-3 Fatty Acids Mean", "n-3 Fatty Acids SD",
+                              "n-6 : n-3 Mean", "n-6 : n-3 SD")
+View(cowsourceC3_C4)
+
+NonTrial_Data <- NonTrial_Data[,-1] #getting rid of Group variable 
+
+austria <- siarmcmcdirichletv4(NonTrial_Data[1:4, ] , cowsourceC3_C4)
+siarhistograms(austria, legloc = 'topright') 
+2
+text(0.2, 35, "Austrian Cattle", cex=1)
+
+brazil <- siarmcmcdirichletv4(NonTrial_Data[5:21, ] , cowsourceC3_C4)
+siarhistograms(brazil, legloc = 'topright') 
+2
+text(0.5, 22, "Brazilian Cattle", cex=1)
+
+uk <- siarmcmcdirichletv4(NonTrial_Data[22:40, ] , cowsourceC3_C4)
+siarhistograms(uk, legloc = 'topright') 
+2
+text(0.5, 14, "UK Cattle", cex=1)
+
+france <- siarmcmcdirichletv4(NonTrial_Data[41:44, ] , cowsourceC3_C4)
+siarhistograms(france, legloc = 'topright') 
+2
+text(0.6, 3, "French Cattle", cex=1)
+
+germany <- siarmcmcdirichletv4(NonTrial_Data[45:50, ] , cowsourceC3_C4)
+siarhistograms(germany, legloc = 'topright') 
+2
+text(0.5, 11, "German Cattle", cex=1)
+
+italy <- siarmcmcdirichletv4(NonTrial_Data[51:68, ] , cowsourceC3_C4)
+siarhistograms(italy, legloc = 'topright') 
+2
+text(0.5, 38, "Italian Cattle", cex=1)
+
+#spain - no fatty acids on spanish cows 
+
+us <- siarmcmcdirichletv4(NonTrial_Data[69:90, ] , cowsourceC3_C4)
+siarhistograms(us, legloc = 'topright') 
+2
+text(0.5, 24, "US Cattle", cex=1)
+
+ireland <- siarmcmcdirichletv4(NonTrial_Data[91:116, ], cowsourceC3_C4)
+siarhistograms(ireland, legloc = 'topright')
+2
+text(0.5, 40, "Irish Cattle", cex=1)
+
+#Again, to get dietary proportion estimate summary stats - run through siarmenu()
+NonTrial_Data$Group <- c(rep(1,4), rep(2,17), rep(3,19), rep(4,4), rep(5,6), 
+                         rep(6,18), rep(7,22), rep(8,26))
+NonTrial_Data <- NonTrial_Data[,c(8,1:7)] #bringing group to the front
+multigroup <- NonTrial_Data[,-2]
+multigroup <- as.matrix(multigroup)
+View(multigroup)
+str(multigroup)
+head(multigroup)
+
+#Then run in SIAR 
+siarmenu()
+
+#Then remove "Group" again 
+NonTrial_Data <- NonTrial_Data[,-1]
+
+
+#############################################################################################################################
+
+
+#LOO-MLR Section
+#glm (multinomial)
+library(MASS)
+library(nnet)
+#??multinom
+
+str(NonTrial_Data)
+NonTrial_Data$COUNTRY <- as.factor(NonTrial_Data$COUNTRY)
+attach(NonTrial_Data)
+View(NonTrial_Data)
+
+rescow <- rep(list(rep(list(NULL),26)), 116)
+pred <- rep(list(rep(list(NULL),8)), 116)
+
+#real step
+#Leave One Out Cross Validation on Multinomial Regression
+
+#going to try leaving out n-3 fatty acid because high correlation
+for(i in 1:nrow(NonTrial_Data)){
+  rescow[[i]] <- multinom(COUNTRY~ . , data=NonTrial_Data[-i,-c(3,4,6)])
+  pred[[i]] <- predict(rescow[[i]], type="probs", 
+                       newdata=NonTrial_Data[i,-1])
+}
+
+x <- NULL
+for(i in 1:116){
+  x[i] <- names(which.max(pred[[i]]))==NonTrial_Data$COUNTRY[i]
+}
+View(cbind(x, as.character(NonTrial_Data$COUNTRY))) #shows which obvs were predicted right
+1-sum(x)/116
+NonTrial_Data$COUNTRY[which(x==T)]
+NonTrial_Data$COUNTRY[which(x==F)] 
+
+which(x==F) #which obs are misclassified
+
+y <- NULL
+for(j in 1:116){
+  y[j] <- names(which.max(pred[[j]]))
+}
+y[x==F] #what is being predicted when we are wrong
+
+wrong <- cbind(y[x==F], as.character(NonTrial_Data$COUNTRY[which(x==F)]))
+colnames(wrong) <- c("Predicted", "True")
+
+wrong <- as.data.frame(wrong)
+View(wrong)
+#View(table(do.call(paste, wrong)))
+library(data.table) 
+setDT(wrong)[, .N, by = c(names(wrong))]
+pred
+#want to make a data frame with;
+# 1) the prob with which the wrong countries were predicted
+# 2) the prob with which the true country was predicted 
+
+#need to double check those numbers
+
+#2)
+probs <- NULL
+i <- 1 
+while(i<2){
+  probs[i] <- pred[which(x==F)][[i]][1]
+  i <- i+1
+}
+while(i<4){
+  probs[i] <- pred[which(x==F)][[i]][2]
+  i <- i+1 
+}
+while(i<7){
+  probs[i] <- pred[which(x==F)][[i]][7]
+  i <- i+1 
+}
+while(i<9){
+  probs[i] <- pred[which(x==F)][[i]][3]
+  i <- i+1 
+}
+while(i<12){
+  probs[i] <- pred[which(x==F)][[i]][4]
+  i <- i+1 
+}
+while(i<14){
+  probs[i] <- pred[which(x==F)][[i]][6]
+  i <- i+1 
+}
+while(i<19){
+  probs[i] <- pred[which(x==F)][[i]][8]
+  i <- i+1 
+}
+while(i<22){
+  probs[i] <- pred[which(x==F)][[i]][5]
+  i <- i+1 
+}
+
+probs <- round(probs, 8)
+together <- cbind(wrong, probs)
+View(together)  
+colnames(together) <- c("Predicted", "True", "Probs the True was given")
+
+
+#1)
+z <- NULL
+for(j in 1:116){
+  z[j] <- max(pred[[j]])
+}
+z <- z[x==F]
+z <- round(z, 8)
+together <- cbind(together, z)
+colnames(together) <- c("Predicted", "True", "Probs the True was given",
+                        "Prob Prediction was made")
+min(z-probs)
+ndx <- order(z-probs, decreasing = F)[1:15]
+(z-probs)[ndx] #some quite small differences 
+
+together <- together[ ,c(1,4,2,3)]
+together <- cbind(together, z-probs)
+colnames(together) <- c("Predicted", "Prob Prediction was made",
+                        "True","Probs the True was given", 
+                        "Difference")
+
+View(together[which(together[,4]<=0.125), ]) 
+View(together[which(together[,4]>=0.125), ]) 
+#doing worse than 12.5% prediction prob is quite bad - let's have a look
+
+
+#PCA plots to explore misclassifications
+
+cow.dat = NonTrial_Data[,2:7]
+sds = apply(cow.dat, 2, sd)
+cow.std = sweep(cow.dat, 2, sds, "/")
+fit.std = prcomp(cow.std)
+
+summary(fit.std) #.7574 variation captured with 2 principal components
+
+newcow = predict(fit.std)
+newcow
+plot(newcow[,1], newcow[,2], xlab="PC1", ylab="PC2", pch=19,
+     col=as.factor(NonTrial_Data$COUNTRY), main="PCA plot of Non Trial Data")
+legend("topleft", legend=levels(as.factor(NonTrial_Data$COUNTRY)), 
+       pch=19, col=as.factor(NonTrial_Data$COUNTRY), cex=0.7) 
+
+#PCA plots of v poorly misclassified obvs
+#ie observations that were predicted worse than random guessing 
+
+#1 - Austria and France
+plot(newcow[c(1:4),1], newcow[c(1:4),2], xlab="PC1", 
+     xlim=c(-5.5,3), ylim=c(-4.5,3), main="Austria and France",
+     ylab="PC2", pch=19, col="cadet blue")
+points(newcow[c(41:44),1], newcow[c(41:44),2],xlab="PC1", 
+       ylab="PC2", pch=19, col="orange")
+points(newcow[1, 1], newcow[1, 2], col="dark red", pch=19, cex=1.2)
+points(newcow[43, 1], newcow[43, 2], col="red", pch=19, cex=1.2)
+legend("topleft", legend=c("Austria", "France", "Austria Misclassified as France",
+                           "France Misclassified as Austria"), pch=19, 
+       col=c("cadet blue", "orange", "darkred", "red"))
+
+#2 - Brazil and US
+plot(newcow[c(5:21),1], newcow[c(5:21),2], xlab="PC1", 
+     xlim=c(-5.5,3), ylim=c(-4.5,3), main="Brazil and US",
+     ylab="PC2", pch=19, col="cadet blue")
+points(newcow[c(69:90),1], newcow[c(69:90),2],xlab="PC1", 
+       ylab="PC2", pch=19, col="orange")
+points(newcow[c(15), 1], newcow[c(15), 2], pch=19, cex=1.2,
+       col="darkred")
+legend("topleft", legend=c("Brazil", "US", "Misclassified"),
+       pch=19, col=c("cadet blue", "orange", "darkred"))
+
+#3 - Brazil and Germany
+plot(newcow[c(5:21),1], newcow[c(5:21),2], xlab="PC1", 
+     xlim=c(-5.5,3), ylim=c(-4.5,3), main="Brazil and Germany",
+     ylab="PC2", pch=19, col="cadet blue")
+points(newcow[c(45:50), 1], newcow[c(45:50),2], xlab="PC1", 
+       ylab="PC2", pch=19, col="orange")
+points(newcow[16, 1], newcow[16, 2], pch=19, cex=1.2,
+       col="darkred")
+legend("topleft", legend=c("Brazil", "Germany", "Brazil Misclassified as Germany"), 
+       pch=19, col=c("cadet blue", "orange", "darkred"))
+
+#4 - Ireland and UK
+plot(newcow[c(91:116),1], newcow[c(91:116),2], xlab="PC1", 
+     xlim=c(-5.5,3), ylim=c(-4.5,3), main="Ireland and UK",
+     ylab="PC2", pch=19, col="cadet blue")
+points(newcow[c(22:40),1], newcow[c(22:40),2],xlab="PC1", 
+       ylab="PC2", pch=19, col="orange")
+points(newcow[c(23,25), 1], newcow[c(23,25), 2], pch=19, 
+       col="darkred", cex=1.2)
+points(newcow[c(103,107), 1], newcow[c(103,107), 2], pch=19, 
+       col="red", cex=1.2)
+legend("topleft", legend=c("Ireland", "UK", "UK Misclassified as Ireland",
+                           "Ireland Misclassified as UK"),
+       pch=19, col=c("cadet blue", "orange", "darkred", "red"))
+
+#5 - Germany and France
+plot(newcow[c(41:44),1], newcow[c(41:44),2], xlab="PC1", 
+     xlim=c(-5.5,3), ylim=c(-4.5,3), main="Germany and France",
+     ylab="PC2", pch=19, col="cadet blue")
+points(newcow[c(45:50),1], newcow[c(45:50),2],xlab="PC1", 
+       ylab="PC2", pch=19, col="orange")
+points(newcow[42, 1], newcow[42, 2], pch=19, cex=1.2,
+       col="darkred")
+legend("topleft", legend=c("France", "Germany", "France Misclassified as Germany"), pch=19, 
+       col=c("cadet blue", "orange", "darkred")) 
+
+#6 - Germany and UK
+plot(newcow[c(45:50),1], newcow[c(45:50),2], xlab="PC1", 
+     xlim=c(-5.5,3), ylim=c(-4.5,3), main="Germany and UK",
+     ylab="PC2", pch=19, col="cadet blue")
+points(newcow[c(22:40),1], newcow[c(22:40),2],xlab="PC1", 
+       ylab="PC2", pch=19, col="orange")
+points(newcow[46, 1], newcow[46, 2], pch=19, cex=1.2,
+       col="darkred")
+legend("topleft", legend=c("Germany", "UK", "Germany Misclassified as UK"), pch=19, 
+       col=c("cadet blue", "orange", "darkred")) 
+
+#7 - Austria and Italy
+plot(newcow[c(51:68),1], newcow[c(51:68),2], xlab="PC1", 
+     xlim=c(-5.5,3), ylim=c(-4.5,3), main="Austria and Italy",
+     ylab="PC2", pch=19, col="cadet blue")
+points(newcow[c(1:4),1], newcow[c(1:4),2],xlab="PC1", 
+       ylab="PC2", pch=19, col="orange")
+points(newcow[59, 1], newcow[59, 2], pch=19, cex=1.2,
+       col="darkred")
+legend("topleft", legend=c("Italy", "Austria", "Italy Misclassified as Austria"), pch=19, 
+       col=c("cadet blue", "orange", "darkred")) 
+
+#8 - Italy and US
+plot(newcow[c(69:90),1], newcow[c(69:90),2], xlab="PC1", 
+     xlim=c(-5.5,3), ylim=c(-4.5,3), main="Italy and US",
+     ylab="PC2", pch=19, col="cadet blue")
+points(newcow[c(51:68),1], newcow[c(51:68),2],xlab="PC1", 
+       ylab="PC2", pch=19, col="orange")
+points(newcow[83, 1], newcow[83, 2], pch=19, cex=1.2,
+       col="darkred")
+legend("topleft", legend=c("US", "Italy", "US Misclassified as Italy"), pch=19, 
+       col=c("cadet blue", "orange", "darkred")) 
+
+#9 - Germany and Ireland
+plot(newcow[c(91:116),1], newcow[c(91:116),2], xlab="PC1", 
+     xlim=c(-5.5,3), ylim=c(-4.5,3), main="Germany and Ireland",
+     ylab="PC2", pch=19, col="cadet blue")
+points(newcow[c(45:50),1], newcow[c(45:50),2],xlab="PC1", 
+       ylab="PC2", pch=19, col="orange")
+points(newcow[94, 1], newcow[94, 2], pch=19, cex=1.2,
+       col="darkred")
+legend("topleft", legend=c("Ireland", "Germany", "Ireland Misclassified as Germany"), pch=19, 
+       col=c("cadet blue", "orange", "darkred")) 
+
+
+#################################################################################################################################
+
+
+#Tukey Kramer Section 
+#standardise
+agg <- aggregate(NonTrial_Data$`n-3 Fatty Acids`, by=list(NonTrial_Data$COUNTRY), sd)
+omega3.std <- c(NonTrial_Data[1:4, 6]/agg[1,2],
+                NonTrial_Data[5:21, 6]/agg[2,2],
+                NonTrial_Data[22:40, 6]/agg[7,2],
+                NonTrial_Data[41:44, 6]/agg[3,2],
+                NonTrial_Data[45:50, 6]/agg[4,2],
+                NonTrial_Data[51:68, 6]/agg[6,2],
+                NonTrial_Data[69:90, 6]/agg[8,2],
+                NonTrial_Data[91:116, 6]/agg[5,2])
+
+str(omega3.std)
+omega3.std <- unlist(omega3.std)
+
+boxplot(omega3.std ~ as.factor(NonTrial_Data$COUNTRY),
+        col=c("darkred","darkred","darkred","darkred", "darkgreen","darkred",
+              "darkred","darkred"),
+        main="Boxplot of Standardised Omega 3 Fatty Acids Across Countries")
+
+aov <- aov(omega3.std ~ as.factor(NonTrial_Data$COUNTRY))
+plot(TukeyHSD(aov)) #family CIs 
+TukeyHSD(aov)
