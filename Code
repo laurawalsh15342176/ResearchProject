@@ -2,30 +2,22 @@
 #Using SIAR and other techniques 
 
 #SIAR Section
-#The model assumes that each target value comes from a Gaussian 
-#distribution with an unknown mean and standard deviation. 
+#The model assumes that each target value comes from a Gaussian distribution with an unknown mean and standard deviation. 
 #Assumed that sources are independent
-#Not all Trial_Data
+#Not all Trial_Data - not 50:50 section
 
-#setwd("~/UCD/Stage 4/Semester 2/Research Project/Data")
+#setwd("~/UCD/Stage 4/Semester 2/Research Project/Data") - set up your own directory
 library(readxl)
 Trial_Data <- read_excel("Trial_Data.xls")
 Trial_Data <- Trial_Data[-c(6,40), ]
-#IN THIS SCRIPT "Trial Data" is only going to have 100% Grass and 
-#100% Concentrate as that is what we are taking to be the "sources" 
+
+#IN THIS SCRIPT "Trial Data" is only going to have 100% Grass and 100% Concentrate as that is what we are taking to be the "sources" 
 attach(Trial_Data)
 View(Trial_Data)
 
-library(psych)
-pairs.panels(Trial_Data[-c(25:48),-1], 
-             method = "pearson", # correlation method
-             density = TRUE,  # show density plots
-             ellipses = F) # show correlation ellipses
+#Trying to fix to follow a normal dist
+#Have a look at densities 
 
-#most are actually possibly okay to transform 
-#some could be fixed by square root, cube root, log 
-
-#Trying to fix to be more normal
 plot(density(d13C[Treatment=="100%Grass"]))  
 plot(density(d13C[Treatment=="Concentrates"]))                 
 
@@ -44,6 +36,7 @@ plot(density(Trial_Data$`C 18:3C9,C12,C15.`[Treatment=="Concentrates"]))
 plot(density(Trial_Data$`n-6 : n-3`[Treatment=="100%Grass"]))
 plot(density(Trial_Data$`n-6 : n-3`[Treatment=="Concentrates"]))
 
+#Shapiro-Wilk test for normality
 shapiro.test(d13C[Treatment=="100%Grass"])                   
 shapiro.test(`C 18:2,C9,C12.`[Treatment=="100%Grass"])
 shapiro.test(`C 18:3C9,C12,C15.`[Treatment=="100%Grass"])
@@ -62,18 +55,17 @@ shapiro.test(`n-6 : n-3`[Treatment=="Concentrates"])
 
 #Validation Step 
 #Checking if we can use the data we have in SIAR the way we wish to 
-Trial_Data <- read_excel("Trial_Data.xls")
-View(Trial_Data)
-
-Trial_Data <- Trial_Data[-c(6,40), ] #getting rid of NAs
+#Take the log of CLA from now on
 Trial_Data$`CLA(C 18:2,C9,T11)` <- log(Trial_Data$`CLA(C 18:2,C9,T11)`)
 attach(Trial_Data)
 
+#Finding means and standard deviations
 GrassStDev = apply(Trial_Data[Treatment=="100%Grass",-1], 2, sd)
 ConcentratesStDev = apply(Trial_Data[Treatment=="Concentrates",-1], 2, sd)
 GrassMean = apply(Trial_Data[Treatment=="100%Grass",-1], 2, mean)
 ConcentratesMean = apply(Trial_Data[Treatment=="Concentrates",-1], 2, mean)
 
+#Make into dataframe
 cowsource <- matrix(c(GrassMean[1],GrassStDev[1],GrassMean[2],GrassStDev[2],
                       GrassMean[3],GrassStDev[3],GrassMean[4],GrassStDev[4],GrassMean[5],
                       GrassStDev[5],GrassMean[6],GrassStDev[6], ConcentratesMean[1],ConcentratesStDev[1],
@@ -91,14 +83,14 @@ colnames(cowsource) <- c("Sources",
                          "n-6 : n-3 Mean", "n-6 : n-3 SD")
 View(cowsource)
 
-#Histogram
+#Run through SIAR to get histogram
 validation <- siarmcmcdirichletv4(as.matrix(Trial_Data[25:48, 2:7]), cowssource)
 siarhistograms(validation, legloc = 'topleft') 
 2
 text(0.75, 23, "50:50 Grass to Concentrate", cex=1)
-#plot shows 50:50 dietary proportion are we were expecting
+#plot shows approximately 50:50 dietary proportion are we were expecting
 
-#now to move on to non-experimental data to estimate dietary proportions
+#Now to move on to non-experimental data to estimate dietary proportions
 NonTrial_Data <- read_excel("NonTrial_Data.xls")
 NonTrial_Data <- NonTrial_Data[ , c(6,8,57,61,62,89,90)] #only keeping relevant cols
 NonTrial_Data <- NonTrial_Data[-c(5,6,24,72:78), ] #getting rid of NAs
@@ -115,11 +107,12 @@ for(i in (1:116)){
            NonTrial_Data[i,j]<-"IRELAND", NonTrial_Data[i,j]<-NonTrial_Data[i,j]) 
   }
 }
+#merging two Irish groups
 
 View(NonTrial_Data)
 attach(NonTrial_Data)
 
-#Histograms
+#Histograms of Dietary Proportions
 austria <- siarmcmcdirichletv4(NonTrial_Data[1:4, ] , cowsource)
 siarhistograms(austria, legloc = 'topleft') 
 2
@@ -150,7 +143,7 @@ siarhistograms(italy, legloc = 'topleft')
 2
 text(0.5, 7, "Italian Cattle", cex=1)
 
-#spain - no fatty acids on spanish cows 
+#spain - no fatty acids on spanish samples - omitted 
 
 us <- siarmcmcdirichletv4(NonTrial_Data[69:90, ] , cowsource)
 siarhistograms(us, legloc = 'topleft') 
@@ -163,9 +156,9 @@ siarhistograms(ireland, legloc = 'topleft')
 text(0.5, 45, "Irish Cattle", cex=1)
 
 #histograms obtained - must run data through siarmenu() function to obtain summary statistics for estimated dietary proportions 
+#setting up to run through siarmenu()
 
-NonTrial_Data$Group <- c(rep(1,4), rep(2,17), rep(3,19), rep(4,4), rep(5,6), 
-                         rep(6,18), rep(7,22), rep(8,26))
+NonTrial_Data$Group <- c(rep(1,4), rep(2,17), rep(3,19), rep(4,4), rep(5,6), rep(6,18), rep(7,22), rep(8,26))
 NonTrial_Data <- NonTrial_Data[,c(8,1:7)] #bringing group to the front
 multigroup <- NonTrial_Data[,-2]
 multigroup <- as.matrix(multigroup)
@@ -190,6 +183,7 @@ con_sd <- 0.5  #Bahar et al.
 #where I'm putting in stats found online (taking out d13c stats from trial data)
 #nothing I can really do about trying to break up concentrate - leave as is
 
+#Setting up to run through SIAR
 GrassStDev = apply(Trial_Data[Treatment=="100%Grass",-1], 2, sd)
 ConcentratesStDev = apply(Trial_Data[Treatment=="Concentrates",-1], 2, sd)
 GrassMean = apply(Trial_Data[Treatment=="100%Grass",-1], 2, mean)
@@ -216,7 +210,9 @@ colnames(cowsourceC3_C4) <- c("Sources",
                               "n-6 : n-3 Mean", "n-6 : n-3 SD")
 View(cowsourceC3_C4)
 
-NonTrial_Data <- NonTrial_Data[,-1] #getting rid of Group variable 
+NonTrial_Data <- NonTrial_Data[,-1] #getting rid of Group variable made previously
+
+#Histograms showing dietary proportion estimates
 
 austria <- siarmcmcdirichletv4(NonTrial_Data[1:4, ] , cowsourceC3_C4)
 siarhistograms(austria, legloc = 'topright') 
@@ -248,7 +244,7 @@ siarhistograms(italy, legloc = 'topright')
 2
 text(0.5, 38, "Italian Cattle", cex=1)
 
-#spain - no fatty acids on spanish cows 
+#spain - no fatty acids on spanish cattle 
 
 us <- siarmcmcdirichletv4(NonTrial_Data[69:90, ] , cowsourceC3_C4)
 siarhistograms(us, legloc = 'topright') 
@@ -261,8 +257,7 @@ siarhistograms(ireland, legloc = 'topright')
 text(0.5, 40, "Irish Cattle", cex=1)
 
 #Again, to get dietary proportion estimate summary stats - run through siarmenu()
-NonTrial_Data$Group <- c(rep(1,4), rep(2,17), rep(3,19), rep(4,4), rep(5,6), 
-                         rep(6,18), rep(7,22), rep(8,26))
+NonTrial_Data$Group <- c(rep(1,4), rep(2,17), rep(3,19), rep(4,4), rep(5,6), rep(6,18), rep(7,22), rep(8,26))
 NonTrial_Data <- NonTrial_Data[,c(8,1:7)] #bringing group to the front
 multigroup <- NonTrial_Data[,-2]
 multigroup <- as.matrix(multigroup)
@@ -281,23 +276,29 @@ NonTrial_Data <- NonTrial_Data[,-1]
 
 
 #LOO-MLR Section
-#glm (multinomial)
+
 library(MASS)
 library(nnet)
-#??multinom
 
 str(NonTrial_Data)
 NonTrial_Data$COUNTRY <- as.factor(NonTrial_Data$COUNTRY)
 attach(NonTrial_Data)
 View(NonTrial_Data)
 
+library(psych)
+pairs.panels(NonTrial_Data[,-1], 
+             method = "pearson", 
+             density = TRUE, 
+             ellipses = F) 
+#pairs plot show high multicollinearity
+
 rescow <- rep(list(rep(list(NULL),26)), 116)
 pred <- rep(list(rep(list(NULL),8)), 116)
 
-#real step
 #Leave One Out Cross Validation on Multinomial Regression
 
-#going to try leaving out n-3 fatty acid because high correlation
+#going to try leaving out variables because high multicollinearity
+
 for(i in 1:nrow(NonTrial_Data)){
   rescow[[i]] <- multinom(COUNTRY~ . , data=NonTrial_Data[-i,-c(3,4,6)])
   pred[[i]] <- predict(rescow[[i]], type="probs", 
@@ -306,12 +307,14 @@ for(i in 1:nrow(NonTrial_Data)){
 
 x <- NULL
 for(i in 1:116){
-  x[i] <- names(which.max(pred[[i]]))==NonTrial_Data$COUNTRY[i]
+  x[i] <- names(which.max(pred[[i]]))==NonTrial_Data$COUNTRY[i]   #counting the number of correct classifications
 }
+
 View(cbind(x, as.character(NonTrial_Data$COUNTRY))) #shows which obvs were predicted right
-1-sum(x)/116
-NonTrial_Data$COUNTRY[which(x==T)]
-NonTrial_Data$COUNTRY[which(x==F)] 
+1-sum(x)/116 #misclassification rate
+
+NonTrial_Data$COUNTRY[which(x==T)]   #showing correctly predicted obs
+NonTrial_Data$COUNTRY[which(x==F)]   #showing incorrectly predicted obs
 
 which(x==F) #which obs are misclassified
 
@@ -319,24 +322,23 @@ y <- NULL
 for(j in 1:116){
   y[j] <- names(which.max(pred[[j]]))
 }
-y[x==F] #what is being predicted when we are wrong
+y[x==F] #what is being predicted when the misclassifications are occurring 
 
 wrong <- cbind(y[x==F], as.character(NonTrial_Data$COUNTRY[which(x==F)]))
 colnames(wrong) <- c("Predicted", "True")
 
 wrong <- as.data.frame(wrong)
 View(wrong)
-#View(table(do.call(paste, wrong)))
+
 library(data.table) 
-setDT(wrong)[, .N, by = c(names(wrong))]
-pred
+setDT(wrong)[, .N, by = c(names(wrong))] #showing count of misclassifications
+
 #want to make a data frame with;
 # 1) the prob with which the wrong countries were predicted
 # 2) the prob with which the true country was predicted 
 
-#need to double check those numbers
-
 #2)
+#pull out the probabilities which were given to the correct country
 probs <- NULL
 i <- 1 
 while(i<2){
@@ -374,46 +376,47 @@ while(i<22){
 
 probs <- round(probs, 8)
 together <- cbind(wrong, probs)
-View(together)  
-colnames(together) <- c("Predicted", "True", "Probs the True was given")
-
 
 #1)
+#pulling the largest probability associated with each observations
 z <- NULL
 for(j in 1:116){
   z[j] <- max(pred[[j]])
 }
 z <- z[x==F]
 z <- round(z, 8)
-together <- cbind(together, z)
-colnames(together) <- c("Predicted", "True", "Probs the True was given",
-                        "Prob Prediction was made")
-min(z-probs)
-ndx <- order(z-probs, decreasing = F)[1:15]
-(z-probs)[ndx] #some quite small differences 
+
+together <- cbind(together, z) #appending
+
+min(z-probs) 
 
 together <- together[ ,c(1,4,2,3)]
 together <- cbind(together, z-probs)
 colnames(together) <- c("Predicted", "Prob Prediction was made",
                         "True","Probs the True was given", 
                         "Difference")
+#dataframe showing all misclassified obs, what was predicted along with associated probability, what the true origin was, 
+#the probability assigned to that country, and the difference in the probabilities
 
 View(together[which(together[,4]<=0.125), ]) 
 View(together[which(together[,4]>=0.125), ]) 
-#doing worse than 12.5% prediction prob is quite bad - let's have a look
+
+#doing worse than 12.5% prediction prob is quite bad as it's worse than random guessing - let's have a look
 
 
-#PCA plots to explore misclassifications
+
+#PCA plots to explore misclassifications - visualisation tool
 
 cow.dat = NonTrial_Data[,2:7]
 sds = apply(cow.dat, 2, sd)
 cow.std = sweep(cow.dat, 2, sds, "/")
 fit.std = prcomp(cow.std)
 
-summary(fit.std) #.7574 variation captured with 2 principal components
+summary(fit.std) #.7574 of total variation captured with 2 principal components
 
 newcow = predict(fit.std)
 newcow
+
 plot(newcow[,1], newcow[,2], xlab="PC1", ylab="PC2", pch=19,
      col=as.factor(NonTrial_Data$COUNTRY), main="PCA plot of Non Trial Data")
 legend("topleft", legend=levels(as.factor(NonTrial_Data$COUNTRY)), 
