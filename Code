@@ -443,10 +443,13 @@ plot(newcow[c(5:21),1], newcow[c(5:21),2], xlab="PC1",
      ylab="PC2", pch=19, col="cadet blue")
 points(newcow[c(69:90),1], newcow[c(69:90),2],xlab="PC1", 
        ylab="PC2", pch=19, col="orange")
-points(newcow[c(15), 1], newcow[c(15), 2], pch=19, cex=1.2,
+points(newcow[15, 1], newcow[15, 2], pch=19, cex=1.2,
        col="darkred")
-legend("topleft", legend=c("Brazil", "US", "Misclassified"),
-       pch=19, col=c("cadet blue", "orange", "darkred"))
+points(newcow[86, 1], newcow[86, 2], pch=19, cex=1.2,
+       col="red")
+legend("topleft", legend=c("Brazil", "US", "Brazil Misclassified as US", 
+                           "US Misclassified as Brazil"),
+       pch=19, col=c("cadet blue", "orange", "darkred", "red"))
 
 #3 - Brazil and Germany
 plot(newcow[c(5:21),1], newcow[c(5:21),2], xlab="PC1", 
